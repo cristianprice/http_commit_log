@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"os"
 
+	"github.com/gdexlab/go-render/render"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -23,6 +25,8 @@ func init() {
 		FullTimestamp: true,
 		ForceColors:   true,
 	})
+
+	log.SetLevel(log.DebugLevel)
 }
 
 const (
@@ -50,7 +54,10 @@ func ReadConfig() *Config {
 }
 
 func (c *Config) readFile() *Config {
-	f, err := os.Open("config.yml")
+	configFilePath := flag.String("config", "config.json", "Provide a config file.")
+	flag.Parse()
+
+	f, err := os.Open(*configFilePath)
 	if err != nil {
 		log.Warn("Could not find config file, setting defaults. ", err)
 		return c
@@ -62,6 +69,8 @@ func (c *Config) readFile() *Config {
 	if err != nil {
 		log.Warn("Could not find config file, setting defaults. ", err)
 	}
+
+	log.Debug("Config values: ", render.Render(c))
 
 	return c
 }
