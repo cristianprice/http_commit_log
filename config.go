@@ -32,7 +32,7 @@ func init() {
 const (
 	FlushOnCommit         = "SyncOnTxEnd"
 	WaitForBatchOrTimeout = "WaitForBatchOrTimeout"
-)
+) 
 
 //Config is a configuration struct.
 type Config struct {
