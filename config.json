@@ -1,0 +1,12 @@
+{
+  "server": {
+    "port": 10000,
+    "host": "localhost"
+  },
+  "logFile": {
+    "defaultLogBehaviour": "SyncOnTxEnd",
+    "maxLogFileSize": 16,
+    "maxLogEntrySize": 1,
+    "logFlushTimeoutMillis": 200
+  }
+}

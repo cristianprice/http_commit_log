@@ -1,6 +1,0 @@
-httpServer:
-  port: 10000
-  host: localhost
-
-logFile:
-  defaultLogBehaviour: SyncOnTxEnd

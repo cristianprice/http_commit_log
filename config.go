@@ -1,11 +1,10 @@
 package main
 
 import (
-	"flag"
+	"encoding/json"
 	"os"
 
 	log "github.com/sirupsen/logrus"
-	yaml "gopkg.in/yaml.v2"
 )
 
 type Color string
@@ -34,28 +33,20 @@ const (
 //Config is a configuration struct.
 type Config struct {
 	HTTPServerConfig struct {
-		Port *int    `yaml:"port"`
-		Host *string `yaml:"host"`
-	} `yaml:"httpServer"`
-
+		Port *int    `json:"port"`
+		Host *string `json:"host"`
+	} `json:"server"`
 	LogFile struct {
-		DefaultLogBehaviour   *string `yaml: "defaultLogBehaviour"`
-		MaxFileSize           *int    `yaml: "maxFileSize"`
-		MaxLogEntrySize       *int    `yaml: "maxLogEntrySize"`
-		LogFlushTimeoutMillis *int64  `yaml: "logFlushTimeoutMillis"`
-	} `yaml:"logFile"`
+		DefaultLogBehaviour   *string `json:"defaultLogBehaviour"`
+		MaxLogFileSize        *int    `json:"maxLogFileSize"`
+		MaxLogEntrySize       *int    `json:"maxLogEntrySize"`
+		LogFlushTimeoutMillis *int    `json:"logFlushTimeoutMillis"`
+	} `json:"logFile"`
 }
 
 func ReadConfig() *Config {
 	ret := &Config{}
 	return ret.readFile()
-}
-
-func (c *Config) readCmdLine() *Config {
-	c.HTTPServerConfig.Host = flag.String("host", "localhost", "Host to bind.")
-
-	flag.Parse()
-	return c
 }
 
 func (c *Config) readFile() *Config {
@@ -66,7 +57,7 @@ func (c *Config) readFile() *Config {
 	}
 	defer f.Close()
 
-	decoder := yaml.NewDecoder(f)
+	decoder := json.NewDecoder(f)
 	err = decoder.Decode(c)
 	if err != nil {
 		log.Warn("Could not find config file, setting defaults. ", err)
