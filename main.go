@@ -6,4 +6,7 @@ import (
 
 func main() {
 	log.Info("Starting server on port: ", 8080)
+
+	config := ReadConfig()
+	log.Info("Config: ", config)
 }
