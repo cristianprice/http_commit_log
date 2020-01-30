@@ -29,10 +29,12 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
+type WalSyncType string
+
 const (
-	FlushOnCommit         = "SyncOnTxEnd"
-	WaitForBatchOrTimeout = "WaitForBatchOrTimeout"
-) 
+	FlushOnCommit         WalSyncType = "SyncOnTxEnd"
+	WaitForBatchOrTimeout WalSyncType = "WaitForBatchOrTimeout"
+)
 
 //Config is a configuration struct.
 type Config struct {
