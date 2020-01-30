@@ -12,7 +12,7 @@ type WalRecord struct {
 
 type WalRecordId struct {
 	Timestamp int64
-	Sequence  int32
+	Sequence  uint32
 	Partition int32
 }
 
@@ -23,9 +23,11 @@ type walExRecord struct {
 }
 
 type PartitionedWalWriter struct {
-	partitionCount      int32
+	partitionCount      uint32
 	topicName           string
 	defaultLogBehaviour WalSyncType
+
+	sequence_counter uint32
 
 	writerChannel chan WalRecord
 	resultChannel chan WalRecordId
@@ -36,7 +38,7 @@ type WalWriter interface {
 	Close()
 }
 
-func NewWalWriter(topicName string, partitionCount int32, defaultLogBehaviour WalSyncType) WalWriter {
+func NewWalWriter(topicName string, partitionCount uint32, defaultLogBehaviour WalSyncType) WalWriter {
 
 	pw := PartitionedWalWriter{
 		partitionCount:      partitionCount,
