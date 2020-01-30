@@ -28,6 +28,7 @@ type PartitionedWalWriter struct {
 	defaultLogBehaviour WalSyncType
 
 	writerChannel chan WalRecord
+	resultChannel chan WalRecordId
 }
 
 type WalWriter interface {
@@ -41,7 +42,12 @@ func NewWalWriter(topicName string, partitionCount int32, defaultLogBehaviour Wa
 		topicName:           topicName,
 		defaultLogBehaviour: defaultLogBehaviour,
 		writerChannel:       make(chan WalRecord),
+		resultChannel:       make(chan WalRecordId),
 	}
+
+	go func() {
+
+	}()
 
 	return WalWriter(&pw)
 }
@@ -51,7 +57,5 @@ func (w *PartitionedWalWriter) Close() {
 }
 
 func (w *PartitionedWalWriter) Write(ctx context.Context, wr *WalRecord) <-chan WalRecordId {
-	ret := make(chan WalRecordId)
-
-	return ret
+	return w.resultChannel
 }
