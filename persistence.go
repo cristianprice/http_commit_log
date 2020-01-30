@@ -33,6 +33,7 @@ type PartitionedWalWriter struct {
 
 type WalWriter interface {
 	Write(ctx context.Context, wr *WalRecord) <-chan WalRecordId
+	Close()
 }
 
 func NewWalWriter(topicName string, partitionCount int32, defaultLogBehaviour WalSyncType) WalWriter {
