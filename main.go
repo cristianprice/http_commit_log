@@ -7,8 +7,6 @@ import (
 func main() {
 	log.Info("Starting server on port: ", 8080)
 
-	config := ReadConfig()
-
-	a := ""
-	config.HTTPServerConfig.Host = &a
+	w := NewWalWriter("sd", 1, "Wee")
+	println(w)
 }

@@ -22,7 +22,7 @@ type walExRecord struct {
 	Crc int32
 }
 
-type WalWriter struct {
+type PartitionedWalWriter struct {
 	partitionCount      int32
 	topicName           string
 	defaultLogBehaviour WalSyncType
@@ -30,19 +30,27 @@ type WalWriter struct {
 	writerChannel chan WalRecord
 }
 
-func NewWalWriter(topicName string, partitionCount int32, defaultLogBehaviour WalSyncType) *WalWriter {
+type WalWriter interface {
+	Write(ctx context.Context, wr *WalRecord) <-chan WalRecordId
+}
 
-	ret := &WalWriter{
+func NewWalWriter(topicName string, partitionCount int32, defaultLogBehaviour WalSyncType) WalWriter {
+
+	pw := PartitionedWalWriter{
 		partitionCount:      partitionCount,
 		topicName:           topicName,
 		defaultLogBehaviour: defaultLogBehaviour,
 		writerChannel:       make(chan WalRecord),
 	}
 
-	return ret
+	return WalWriter(&pw)
 }
 
-func (w *WalWriter) Write(ctx context.Context, wr *WalRecord) <-chan WalRecordId {
+func (w *PartitionedWalWriter) Close() {
+	close(w.writerChannel)
+}
+
+func (w *PartitionedWalWriter) Write(ctx context.Context, wr *WalRecord) <-chan WalRecordId {
 	ret := make(chan WalRecordId)
 
 	return ret
