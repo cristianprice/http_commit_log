@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"os"
 )
 
 type WalRecord struct {
@@ -26,6 +28,7 @@ type PartitionedWalWriter struct {
 	partitionCount      uint32
 	topicName           string
 	defaultLogBehaviour WalSyncType
+	fileDirPath         string
 
 	sequence_counter uint32
 
@@ -33,9 +36,42 @@ type PartitionedWalWriter struct {
 	resultChannel chan WalRecordId
 }
 
+type singlePartitionWalWriter struct {
+	parent          *PartitionedWalWriter
+	partitionNumber uint32
+
+	writer *io.Writer
+}
+
 type WalWriter interface {
 	Write(ctx context.Context, wr *WalRecord) <-chan WalRecordId
 	Close()
+}
+
+func NewSinglePatitionWalWriter(parent *PartitionedWalWriter, partitionNumber uint32) WalWriter {
+	err := os.MkdirAll(fmt.Sprintf("%s%c%d", parent.fileDirPath, os.PathSeparator, partitionNumber), os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+
+	pw := singlePartitionWalWriter{
+		parent:          parent,
+		partitionNumber: partitionNumber,
+	}
+
+	go func() {
+
+	}()
+
+	return WalWriter(&pw)
+}
+
+func (w *singlePartitionWalWriter) Write(ctx context.Context, wr *WalRecord) <-chan WalRecordId {
+	return nil
+}
+
+func (w *singlePartitionWalWriter) Close() {
+	w.Close()
 }
 
 func NewWalWriter(topicName string, partitionCount uint32, defaultLogBehaviour WalSyncType) WalWriter {
