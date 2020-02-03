@@ -2,7 +2,12 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/binary"
+	"errors"
 	"fmt"
+	"hash/crc32"
+	"io"
 	"io/ioutil"
 	"os"
 	"sort"
@@ -26,7 +31,7 @@ type WalRecordId struct {
 type WalExRecord struct {
 	Record *WalRecord
 	Id     *WalRecordId
-	Crc    int32
+	Crc    uint32
 }
 
 type WalPartitionWriter struct {
@@ -40,6 +45,131 @@ type WalPartitionWriter struct {
 	WalSyncType WalSyncType
 	File        *os.File
 	Writer      *bufio.Writer
+
+	CurrentOffset int64
+}
+
+func (wr *WalRecord) Write(p []byte) (n int, err error) {
+	var idx uint32 = 0
+
+	if len(p) < 4 {
+		return -1, errors.New("Slice length not large enough. Could not read key length.")
+	}
+
+	length := binary.LittleEndian.Uint32(p[idx:])
+	idx += uint32(binary.Size(length))
+
+	if uint32(len(p[idx:])) < length {
+		return -1, errors.New("Slice length not large enough. Could not read key.")
+	}
+
+	wr.Key = string(p[idx:(idx + length)])
+	idx += length
+
+	if uint32(len(p[idx:])) < 4 {
+		return -1, errors.New("Slice length not large enough. Could not read value length.")
+	}
+
+	length = binary.LittleEndian.Uint32(p[idx:])
+	idx += uint32(binary.Size(length))
+
+	if uint32(len(p[idx:])) < length {
+		return -1, errors.New("Slice length not large enough. Could not read value.")
+	}
+
+	wr.Value = p[idx:]
+
+	return int(idx + length), nil
+}
+
+func (wr *WalRecord) Read(p []byte) (n int, err error) {
+
+	b, err := wr.Bytes()
+	if err != nil {
+		return -1, err
+	}
+
+	return copy(p, b), nil
+}
+
+func (wr *WalRecord) Bytes() ([]byte, error) {
+	buff := bytes.Buffer{}
+	tmpBuff := make([]byte, 4)
+
+	//Encode key Len and key first.
+	valBytes := []byte(wr.Key)
+	binary.LittleEndian.PutUint32(tmpBuff, uint32(len(valBytes)))
+
+	_, err := buff.Write(tmpBuff)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buff.Write(valBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	//Now encode value len and value.
+	valBytes = []byte(wr.Value)
+	binary.LittleEndian.PutUint32(tmpBuff, uint32(len(valBytes)))
+
+	_, err = buff.Write(tmpBuff)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buff.Write(valBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return buff.Bytes(), nil
+}
+
+func writeTo(w io.Writer, timestamp int64, sequence uint32) (n int, err error) {
+	b := make([]byte, binary.Size(timestamp)+binary.Size(sequence))
+	binary.LittleEndian.PutUint64(b, uint64(timestamp))
+	binary.LittleEndian.PutUint32(b[8:], uint32(sequence))
+
+	return w.Write(b)
+}
+
+func NewWalExRecord(wr *WalRecord, sequence uint32, timestamp int64) *WalExRecord {
+
+	ret := &WalExRecord{
+		Record: wr,
+		Id: &WalRecordId{
+			Timestamp: timestamp,
+			Sequence:  sequence,
+		},
+	}
+
+	crc32q := crc32.MakeTable(crc32.Koopman)
+	hash := crc32.New(crc32q)
+
+	writer := io.Writer(hash)
+	c, err := writeTo(writer, timestamp, sequence)
+	if err != nil || c < binary.Size(sequence)+binary.Size(timestamp) {
+		log.Panic("Failed to write bytes ...: ", err)
+		return nil
+	}
+
+	c, err = hash.Write([]byte(ret.Record.Key))
+	if err != nil || c < len(ret.Record.Key) {
+		log.Panic("Failed to write bytes ...: ", err)
+		return nil
+	}
+
+	c, err = hash.Write(ret.Record.Value)
+	if err != nil || c < len(ret.Record.Value) {
+		log.Panic("Failed to write bytes ...: ", err)
+		return nil
+	}
+
+	ret.Crc = hash.Sum32()
+
+	return ret
 }
 
 func NewWalPartitionWriter(partitionParentDir string, partitionNumber uint32, maxSegmentSize int64, wst WalSyncType) (*WalPartitionWriter, error) {
@@ -67,13 +197,13 @@ func NewWalPartitionWriter(partitionParentDir string, partitionNumber uint32, ma
 	return ret, nil
 }
 
-func (w *WalPartitionWriter) Write(bytes []byte) int {
+func (w *WalPartitionWriter) Write(wr *WalExRecord) int {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
-	count, err := w.Writer.Write(bytes)
+	count, err := w.Writer.Write(nil)
 	if err != nil {
-		log.Warn("Failed to write byte count: ", len(bytes))
+		log.Panic("Failed to write byte count: ", len(wr.Record.Value))
 	}
 
 	return count
