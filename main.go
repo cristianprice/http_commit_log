@@ -19,11 +19,11 @@ func main() {
 		Value: []byte{0x00, 0x01, 0x02, 0x03},
 	}
 
-	b, err := wr.Bytes()
-	cnt, err := wr.Write(b)
-	println(cnt)
-
 	wrEx := NewWalExRecord(wr, 1, time.Now().UnixNano())
+
+	b, err := wrEx.Bytes()
+	cnt, err := wrEx.Write(b)
+	println(cnt)
 
 	pw.Write(wrEx)
 	defer pw.Close()

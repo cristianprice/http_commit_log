@@ -49,14 +49,47 @@ type WalPartitionWriter struct {
 	CurrentOffset int64
 }
 
+func (wer *WalExRecord) Write(p []byte) (n int, err error) {
+	var idx uint32 = 0
+	var tmpUint64 uint64 = 0
+
+	if len(p) < binary.Size(tmpUint64) {
+		return -1, errors.New("Slice length not large enough. Could not read timestamp.")
+	}
+
+	wer.Id.Timestamp = int64(binary.LittleEndian.Uint64(p))
+	idx += uint32(binary.Size(wer.Id.Timestamp))
+
+	if len(p[idx:]) < binary.Size(wer.Id.Sequence) {
+		return -1, errors.New("Slice length not large enough. Could not read sequence.")
+	}
+
+	wer.Id.Sequence = uint32(binary.LittleEndian.Uint32(p[idx:]))
+	idx += uint32(binary.Size(wer.Id.Sequence))
+
+	cnt, err := wer.Record.Write(p[idx:])
+	if err != nil {
+		return -1, err
+	}
+
+	idx += uint32(cnt)
+	if len(p[idx:]) < binary.Size(wer.Crc) {
+		return -1, errors.New("Slice length not large enough. Could not read Crc.")
+	}
+
+	wer.Crc = uint32(binary.LittleEndian.Uint32(p[idx:]))
+	return int(idx) + binary.Size(wer.Crc), nil
+}
+
 func (wr *WalRecord) Write(p []byte) (n int, err error) {
 	var idx uint32 = 0
+	var length uint32 = 0
 
-	if len(p) < 4 {
+	if len(p) < binary.Size(length) {
 		return -1, errors.New("Slice length not large enough. Could not read key length.")
 	}
 
-	length := binary.LittleEndian.Uint32(p[idx:])
+	length = binary.LittleEndian.Uint32(p[idx:])
 	idx += uint32(binary.Size(length))
 
 	if uint32(len(p[idx:])) < length {
@@ -77,7 +110,7 @@ func (wr *WalRecord) Write(p []byte) (n int, err error) {
 		return -1, errors.New("Slice length not large enough. Could not read value.")
 	}
 
-	wr.Value = p[idx:]
+	wr.Value = p[idx:(idx + length)]
 
 	return int(idx + length), nil
 }
@@ -90,6 +123,31 @@ func (wr *WalRecord) Read(p []byte) (n int, err error) {
 	}
 
 	return copy(p, b), nil
+}
+
+func (wr *WalExRecord) Bytes() ([]byte, error) {
+	buff := bytes.Buffer{}
+	tmpBuff := make([]byte, 8)
+
+	binary.LittleEndian.PutUint64(tmpBuff, uint64(wr.Id.Timestamp))
+	buff.Write(tmpBuff)
+
+	tmpBuff = tmpBuff[:4]
+	binary.LittleEndian.PutUint32(tmpBuff, uint32(wr.Id.Sequence))
+	buff.Write(tmpBuff)
+
+	recBuff, err := wr.Record.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	buff.Write(recBuff)
+
+	tmpBuff = tmpBuff[:4]
+	binary.LittleEndian.PutUint32(tmpBuff, uint32(wr.Crc))
+	buff.Write(tmpBuff)
+
+	return buff.Bytes(), nil
 }
 
 func (wr *WalRecord) Bytes() ([]byte, error) {
