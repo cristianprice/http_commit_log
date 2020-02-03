@@ -81,6 +81,16 @@ func (wer *WalExRecord) Write(p []byte) (n int, err error) {
 	return int(idx) + binary.Size(wer.Crc), nil
 }
 
+func (wr *WalExRecord) Read(p []byte) (n int, err error) {
+
+	b, err := wr.Bytes()
+	if err != nil {
+		return -1, err
+	}
+
+	return copy(p, b), nil
+}
+
 func (wr *WalRecord) Write(p []byte) (n int, err error) {
 	var idx uint32 = 0
 	var length uint32 = 0
@@ -193,6 +203,14 @@ func writeTo(w io.Writer, timestamp int64, sequence uint32) (n int, err error) {
 	return w.Write(b)
 }
 
+func Crc32(b []byte) (uint32, error) {
+	crc32q := crc32.MakeTable(crc32.Koopman)
+	hash := crc32.New(crc32q)
+
+	hash.Write(b)
+	return hash.Sum32(), nil
+}
+
 func NewWalExRecord(wr *WalRecord, sequence uint32, timestamp int64) *WalExRecord {
 
 	ret := &WalExRecord{
@@ -203,29 +221,15 @@ func NewWalExRecord(wr *WalRecord, sequence uint32, timestamp int64) *WalExRecor
 		},
 	}
 
-	crc32q := crc32.MakeTable(crc32.Koopman)
-	hash := crc32.New(crc32q)
-
-	writer := io.Writer(hash)
-	c, err := writeTo(writer, timestamp, sequence)
-	if err != nil || c < binary.Size(sequence)+binary.Size(timestamp) {
-		log.Panic("Failed to write bytes ...: ", err)
-		return nil
+	b, err := ret.Bytes()
+	if err != nil {
+		panic(err)
 	}
 
-	c, err = hash.Write([]byte(ret.Record.Key))
-	if err != nil || c < len(ret.Record.Key) {
-		log.Panic("Failed to write bytes ...: ", err)
-		return nil
+	ret.Crc, err = Crc32(b[:(len(b) - 4)])
+	if err != nil {
+		panic(err)
 	}
-
-	c, err = hash.Write(ret.Record.Value)
-	if err != nil || c < len(ret.Record.Value) {
-		log.Panic("Failed to write bytes ...: ", err)
-		return nil
-	}
-
-	ret.Crc = hash.Sum32()
 
 	return ret
 }
