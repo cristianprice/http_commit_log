@@ -18,6 +18,29 @@ type WalExRecord struct {
 	Crc    uint32
 }
 
+func NewWalExRecord(wr *WalRecord, sequence uint32, timestamp int64) *WalExRecord {
+
+	ret := &WalExRecord{
+		Record: wr,
+		Id: &WalRecordId{
+			Timestamp: timestamp,
+			Sequence:  sequence,
+		},
+	}
+
+	b, err := ret.Bytes()
+	if err != nil {
+		panic(err)
+	}
+
+	ret.Crc, err = Crc32(b[:(len(b) - binary.Size(ret.Crc))])
+	if err != nil {
+		panic(err)
+	}
+
+	return ret
+}
+
 func (wr *WalExRecord) Bytes() ([]byte, error) {
 	buff := bytes.Buffer{}
 	tmpBuff := make([]byte, 8)

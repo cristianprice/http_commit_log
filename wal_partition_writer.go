@@ -2,10 +2,8 @@ package main
 
 import (
 	"bufio"
-	"encoding/binary"
 	"fmt"
 	"hash/crc32"
-	"io"
 	"io/ioutil"
 	"os"
 	"sort"
@@ -30,43 +28,12 @@ type WalPartitionWriter struct {
 	CurrentOffset int64
 }
 
-func writeTo(w io.Writer, timestamp int64, sequence uint32) (n int, err error) {
-	b := make([]byte, binary.Size(timestamp)+binary.Size(sequence))
-	binary.LittleEndian.PutUint64(b, uint64(timestamp))
-	binary.LittleEndian.PutUint32(b[8:], uint32(sequence))
-
-	return w.Write(b)
-}
-
 func Crc32(b []byte) (uint32, error) {
 	crc32q := crc32.MakeTable(crc32.Koopman)
 	hash := crc32.New(crc32q)
 
 	hash.Write(b)
 	return hash.Sum32(), nil
-}
-
-func NewWalExRecord(wr *WalRecord, sequence uint32, timestamp int64) *WalExRecord {
-
-	ret := &WalExRecord{
-		Record: wr,
-		Id: &WalRecordId{
-			Timestamp: timestamp,
-			Sequence:  sequence,
-		},
-	}
-
-	b, err := ret.Bytes()
-	if err != nil {
-		panic(err)
-	}
-
-	ret.Crc, err = Crc32(b[:(len(b) - 4)])
-	if err != nil {
-		panic(err)
-	}
-
-	return ret
 }
 
 func NewWalPartitionWriter(partitionParentDir string, partitionNumber uint32, maxSegmentSize int64, wst WalSyncType) (*WalPartitionWriter, error) {
