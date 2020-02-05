@@ -20,11 +20,11 @@ func main() {
 	}
 
 	wrEx := NewWalExRecord(wr, 1, time.Now().UnixNano())
-
 	b, err := wrEx.Bytes()
-	cnt, err := wrEx.Write(b)
-	println(cnt)
+	if err != nil {
+		panic(err)
+	}
 
-	pw.Write(wrEx)
+	pw.Write(b)
 	defer pw.Close()
 }

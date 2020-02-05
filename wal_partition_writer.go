@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/binary"
 	"fmt"
 	"hash/crc32"
 	"io/ioutil"
@@ -61,16 +62,30 @@ func NewWalPartitionWriter(partitionParentDir string, partitionNumber uint32, ma
 	return ret, nil
 }
 
-func (w *WalPartitionWriter) Write(wr *WalExRecord) int {
+func (w *WalPartitionWriter) Write(p []byte) (n int, err error) {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
-	count, err := w.Writer.Write(nil)
+	size := []byte{0, 0, 0, 0}
+	binary.LittleEndian.PutUint32(size, uint32(binary.Size(p)))
+
+	ret := 0
+
+	count, err := w.Writer.Write(size)
 	if err != nil {
-		log.Panic("Failed to write byte count: ", len(wr.Record.Value))
+		return -1, err
 	}
 
-	return count
+	ret += count
+
+	count, err = w.Writer.Write(p)
+	if err != nil {
+		return -1, err
+	}
+
+	ret += count
+
+	return ret, nil
 }
 
 func (w *WalPartitionWriter) Close() {
