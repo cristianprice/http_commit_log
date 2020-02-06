@@ -29,10 +29,15 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
+//WalSyncType sets the type of commit.
 type WalSyncType string
 
 const (
-	FlushOnCommit         WalSyncType = "SyncOnTxEnd"
+
+	//FlushOnCommit flushes to disk after each write. Slow performance.
+	FlushOnCommit WalSyncType = "SyncOnTxEnd"
+
+	//WaitForBatchOrTimeout Waits for a set number of commits or a timeout.
 	WaitForBatchOrTimeout WalSyncType = "WaitForBatchOrTimeout"
 )
 
@@ -50,6 +55,7 @@ type Config struct {
 	} `json:"logFile"`
 }
 
+//ReadConfig reads config from a file.
 func ReadConfig() *Config {
 	ret := &Config{}
 	return ret.readFile()

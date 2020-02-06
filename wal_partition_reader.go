@@ -7,30 +7,24 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
-	"sync"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 )
 
-//WalPartitionWriter abstraction for individual partition writer.
-type WalPartitionWriter struct {
-	mutex sync.Mutex
-
+//WalPartitionReader abstraction for individual partition writer.
+type WalPartitionReader struct {
 	Closed          bool
 	PartitionDir    string
 	PartitionNumber uint32
-	MaxSegmentSize  int64
 
-	WalSyncType WalSyncType
-	File        *os.File
-	Writer      *bufio.Writer
+	File   *os.File
+	Reader *bufio.Reader
 
 	CurrentOffset int64
 }
 
-//NewWalPartitionWriter creates a new WalPartitionWriter
-func NewWalPartitionWriter(partitionParentDir string, partitionNumber uint32, maxSegmentSize int64, wst WalSyncType) (*WalPartitionWriter, error) {
+//NewWalPartitionReader creates a new WalPartitionReader
+func NewWalPartitionReader(partitionParentDir string, partitionNumber uint32) (*WalPartitionReader, error) {
 	partitionDir := fmt.Sprintf("%s%c%d", partitionParentDir, os.PathSeparator, partitionNumber)
 	err := os.MkdirAll(partitionDir, os.ModePerm)
 	if err != nil {
@@ -42,7 +36,7 @@ func NewWalPartitionWriter(partitionParentDir string, partitionNumber uint32, ma
 		return nil, err
 	}
 
-	ret := &WalPartitionWriter{
+	ret := &WalPartitionReader{
 		Closed:          false,
 		PartitionDir:    partitionDir,
 		File:            file,
@@ -55,7 +49,7 @@ func NewWalPartitionWriter(partitionParentDir string, partitionNumber uint32, ma
 	return ret, nil
 }
 
-func (w *WalPartitionWriter) Write(p []byte) (n int, err error) {
+func (w *WalPartitionWriter) Read(p []byte) (n int, err error) {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
@@ -124,33 +118,6 @@ func returnLastCreatedWalFile(partitionDir string) (*string, error) {
 		return &ret, nil
 	}
 
-	ret := GenFileNameWith(partitionDir, files[0].Name())
+	ret := genFileNameWith(partitionDir, files[0].Name())
 	return &ret, nil
-}
-
-func createWriter(partitionDir string, maxSegmentSize int64) (*os.File, *bufio.Writer, error) {
-	var file *os.File
-	fileName, err := returnLastCreatedWalFile(partitionDir)
-	if err != nil || *fileName == "" {
-		*fileName = GenFileName(partitionDir)
-	}
-
-	fi, err := os.Stat(*fileName)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, nil, err
-	} else if os.IsNotExist(err) {
-		log.Warn("File: ", *fileName, " does not exist. Creating ...")
-	} else if fi.Size() >= (maxSegmentSize - maxSegmentSize*8/10) {
-		oldFileName := fileName
-		*fileName = GenFileName(partitionDir)
-		log.Warn("File: ", *oldFileName, " exceeds size. Creating new one: ", *fileName)
-	}
-
-	file, err = os.OpenFile(*fileName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	writer := bufio.NewWriter(file)
-	return file, writer, nil
 }
