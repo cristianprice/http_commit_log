@@ -8,7 +8,6 @@ import (
 	"os"
 	"sort"
 	"sync"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 )

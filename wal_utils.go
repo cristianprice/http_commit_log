@@ -28,5 +28,5 @@ func GenFileName(partitionDir string) string {
 
 //MoveToLastValidWalEntry will move the offset to the end of last valid entry
 func MoveToLastValidWalEntry(file os.File) (int64, error) {
-
+	return -1, nil
 }
