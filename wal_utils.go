@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"hash/crc32"
+	"io"
 	"os"
 	"time"
 )
@@ -27,6 +29,34 @@ func GenFileName(partitionDir string) string {
 }
 
 //MoveToLastValidWalEntry will move the offset to the end of last valid entry
-func MoveToLastValidWalEntry(file os.File) (int64, error) {
-	return -1, nil
+func MoveToLastValidWalEntry(file *os.File, sizeLimit uint32) (int64, error) {
+	var ret int64
+	szBytes := []byte{0, 0, 0, 0}
+
+	for {
+		n, err := io.ReadFull(file, szBytes)
+		if n == 0 && err == io.EOF {
+			return ret, nil
+		} else if err == io.ErrUnexpectedEOF {
+			return ret, err
+		}
+
+		ret += int64(n)
+
+		sz := binary.LittleEndian.Uint32(szBytes)
+		if sz > sizeLimit {
+			return -1, fmt.Errorf("Content size if above %d", sizeLimit)
+		}
+
+		cnt := make([]byte, sz)
+		n, err = io.ReadFull(file, cnt)
+		if n == 0 && err == io.EOF {
+			ret += int64(n)
+			return ret, nil
+		} else if err == io.ErrUnexpectedEOF {
+			return ret, err
+		}
+
+		ret += int64(n)
+	}
 }
