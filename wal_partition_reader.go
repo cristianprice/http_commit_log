@@ -49,9 +49,9 @@ func createReader(partitionParentDir string, walFile string, offset int64) (*os.
 	return nil, nil, nil
 }
 
-func (w *WalPartitionReader) ReadNextEntry() (size uint32, p []byte, err error) {
+func (w *WalPartitionReader) ReadNextEntry() (wr *WalExRecord, err error) {
 
-	return 0, nil, nil
+	return nil, nil
 }
 
 //Close closes the underlaying file handle.
