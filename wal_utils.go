@@ -31,12 +31,13 @@ func GenFileName(partitionDir string) string {
 //MoveToLastValidWalEntry will move the offset to the end of last valid entry
 func MoveToLastValidWalEntry(file *os.File, sizeLimit uint32) (int64, error) {
 	var ret int64
+	var retValid int64
 	szBytes := []byte{0, 0, 0, 0}
 
 	for {
 		n, err := io.ReadFull(file, szBytes)
 		if n == 0 && err == io.EOF {
-			return ret, nil
+			return retValid, nil
 		} else if err == io.ErrUnexpectedEOF {
 			return ret, err
 		}
@@ -54,9 +55,10 @@ func MoveToLastValidWalEntry(file *os.File, sizeLimit uint32) (int64, error) {
 			ret += int64(n)
 			return ret, nil
 		} else if err == io.ErrUnexpectedEOF {
-			return ret, err
+			return retValid, nil
 		}
 
 		ret += int64(n)
+		retValid = ret
 	}
 }
