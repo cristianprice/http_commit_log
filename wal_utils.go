@@ -29,7 +29,7 @@ func GenFileName(partitionDir string) string {
 }
 
 //MoveToLastValidWalEntry will move the offset to the end of last valid entry
-func MoveToLastValidWalEntry(file *os.File, sizeLimit uint32) (int64, error) {
+func MoveToLastValidWalEntry(file *os.File, sizeLimit int64) (int64, error) {
 	var ret int64
 	var retValid int64
 	szBytes := []byte{0, 0, 0, 0}
@@ -45,7 +45,7 @@ func MoveToLastValidWalEntry(file *os.File, sizeLimit uint32) (int64, error) {
 		ret += int64(n)
 
 		sz := binary.LittleEndian.Uint32(szBytes)
-		if sz > sizeLimit {
+		if int64(sz) > sizeLimit {
 			return -1, fmt.Errorf("Content size if above %d", sizeLimit)
 		}
 

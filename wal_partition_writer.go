@@ -36,7 +36,7 @@ func NewWalPartitionWriter(partitionParentDir string, partitionNumber uint32, ma
 		return nil, err
 	}
 
-	file, writer, err := createWriter(partitionDir, maxSegmentSize)
+	file, writer, offset, err := createWriter(partitionDir, maxSegmentSize)
 	if err != nil {
 		return nil, err
 	}
@@ -49,6 +49,7 @@ func NewWalPartitionWriter(partitionParentDir string, partitionNumber uint32, ma
 		MaxSegmentSize:  maxSegmentSize,
 		PartitionNumber: partitionNumber,
 		WalSyncType:     wst,
+		CurrentOffset:   offset,
 	}
 
 	return ret, nil
@@ -127,29 +128,39 @@ func returnLastCreatedWalFile(partitionDir string) (*string, error) {
 	return &ret, nil
 }
 
-func createWriter(partitionDir string, maxSegmentSize int64) (*os.File, *bufio.Writer, error) {
+func createWriter(partitionDir string, maxSegmentSize int64) (*os.File, *bufio.Writer, int64, error) {
 	var file *os.File
 	fileName, err := returnLastCreatedWalFile(partitionDir)
 	if err != nil || *fileName == "" {
 		*fileName = GenFileName(partitionDir)
 	}
 
-	fi, err := os.Stat(*fileName)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, nil, err
-	} else if os.IsNotExist(err) {
-		log.Warn("File: ", *fileName, " does not exist. Creating ...")
-	} else if fi.Size() >= (maxSegmentSize - maxSegmentSize*8/10) {
+	file, err = os.OpenFile(*fileName, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		return nil, nil, -1, err
+	}
+
+	offset, err := MoveToLastValidWalEntry(file, maxSegmentSize)
+	if err != nil {
+		return nil, nil, -1, err
+	}
+
+	if offset > maxSegmentSize {
 		oldFileName := fileName
 		*fileName = GenFileName(partitionDir)
 		log.Warn("File: ", *oldFileName, " exceeds size. Creating new one: ", *fileName)
+		file.Close()
+
+		file, err = os.OpenFile(*fileName, os.O_CREATE|os.O_RDWR, 0644)
+		if err != nil {
+			return nil, nil, -1, err
+		}
+
+		offset = 0
 	}
 
-	file, err = os.OpenFile(*fileName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		return nil, nil, err
-	}
-
+	offset, err = file.Seek(offset, 0)
 	writer := bufio.NewWriter(file)
-	return file, writer, nil
+
+	return file, writer, -1, nil
 }
