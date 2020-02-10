@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"io/ioutil"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -26,6 +28,26 @@ func GenFileNameWith(partitionDir string, fileName string) string {
 //GenFileName generates a new wal file based on nanoseconds.
 func GenFileName(partitionDir string) string {
 	return fmt.Sprint(partitionDir, string(os.PathSeparator), time.Now().UnixNano(), ".wal")
+}
+
+//ReturnLastCreatedWalFile returns the last created wal segment file.
+func ReturnLastCreatedWalFile(partitionDir string) (*string, error) {
+	files, err := ioutil.ReadDir(partitionDir)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(files, func(i1, i2 int) bool {
+		return files[i1].Name() < files[i2].Name()
+	})
+
+	if len(files) == 0 {
+		ret := ""
+		return &ret, nil
+	}
+
+	ret := GenFileNameWith(partitionDir, files[0].Name())
+	return &ret, nil
 }
 
 //MoveToLastValidWalEntry will move the offset to the end of last valid entry

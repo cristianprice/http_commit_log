@@ -4,9 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"sort"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -109,28 +107,9 @@ func (w *WalPartitionWriter) Close() {
 	}
 }
 
-func returnLastCreatedWalFile(partitionDir string) (*string, error) {
-	files, err := ioutil.ReadDir(partitionDir)
-	if err != nil {
-		return nil, err
-	}
-
-	sort.Slice(files, func(i1, i2 int) bool {
-		return files[i1].Name() < files[i2].Name()
-	})
-
-	if len(files) == 0 {
-		ret := ""
-		return &ret, nil
-	}
-
-	ret := GenFileNameWith(partitionDir, files[0].Name())
-	return &ret, nil
-}
-
 func createWriter(partitionDir string, maxSegmentSize int64) (*os.File, *bufio.Writer, int64, error) {
 	var file *os.File
-	fileName, err := returnLastCreatedWalFile(partitionDir)
+	fileName, err := ReturnLastCreatedWalFile(partitionDir)
 	if err != nil || *fileName == "" {
 		*fileName = GenFileName(partitionDir)
 	}
