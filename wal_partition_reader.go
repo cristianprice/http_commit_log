@@ -85,7 +85,7 @@ func (w *WalPartitionReader) ReadNextEntry() (*WalExRecord, int64, error) {
 	w.CurrentOffset += int64(n)
 	wr := &WalExRecord{
 		Record: &WalRecord{},
-		Id:     &WalRecordId{},
+		ID:     &WalRecordID{},
 	}
 	_, err = wr.Write(buff)
 	if err != nil {
