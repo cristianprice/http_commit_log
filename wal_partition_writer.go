@@ -30,7 +30,7 @@ type WalPartitionWriter struct {
 
 //NewWalPartitionWriter creates a new WalPartitionWriter
 func NewWalPartitionWriter(partitionParentDir string, partitionNumber uint32, maxSegmentSize int64, wst WalSyncType) (*WalPartitionWriter, error) {
-	partitionDir := fmt.Sprintf("%s%c%d", partitionParentDir, os.PathSeparator, partitionNumber)
+	partitionDir := fmt.Sprint(partitionParentDir, string(os.PathSeparator), partitionNumber)
 	err := os.MkdirAll(partitionDir, os.ModePerm)
 	if err != nil {
 		return nil, err
@@ -162,5 +162,5 @@ func createWriter(partitionDir string, maxSegmentSize int64) (*os.File, *bufio.W
 	offset, err = file.Seek(offset, 0)
 	writer := bufio.NewWriter(file)
 
-	return file, writer, -1, nil
+	return file, writer, offset, nil
 }

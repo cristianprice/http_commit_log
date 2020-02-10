@@ -9,7 +9,7 @@ import (
 
 func TestMoveToLastValidWalEntryOk(t *testing.T) {
 
-	tmpFile := fmt.Sprintf("%s%c%s", os.TempDir(), os.PathSeparator, "test_file.bin")
+	tmpFile := fmt.Sprint(os.TempDir(), string(os.PathSeparator), "test_file.bin")
 	szBytes := make([]byte, 4)
 
 	var size uint32 = 40
@@ -62,7 +62,7 @@ func TestMoveToLastValidWalEntryOk(t *testing.T) {
 
 func TestMoveToLastValidWalEntryNotOk(t *testing.T) {
 
-	tmpFile := fmt.Sprintf("%s%c%s", os.TempDir(), os.PathSeparator, "test_file.bin")
+	tmpFile := fmt.Sprint(os.TempDir(), string(os.PathSeparator), "test_file.bin")
 	szBytes := make([]byte, 4)
 
 	var size uint32 = 40

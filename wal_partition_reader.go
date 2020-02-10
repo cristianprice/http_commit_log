@@ -23,7 +23,7 @@ type WalPartitionReader struct {
 
 //NewWalPartitionReader creates a new WalPartitionReader
 func NewWalPartitionReader(partitionParentDir string, partitionNumber uint32, walFile string, offset int64) (*WalPartitionReader, error) {
-	partitionDir := fmt.Sprintf("%s%c%d", partitionParentDir, os.PathSeparator, partitionNumber)
+	partitionDir := fmt.Sprint(partitionParentDir, string(os.PathSeparator), partitionNumber)
 	err := os.MkdirAll(partitionDir, os.ModePerm)
 	if err != nil {
 		return nil, err
