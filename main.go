@@ -33,4 +33,16 @@ func main() {
 
 	pw.Write(b)
 	defer pw.Close()
+
+	pr, err := NewWalPartitionReader("c:\\tmp", 1, "1581335638183677900.wal")
+	if err != nil {
+		panic(err)
+	}
+
+	wrEx, currentOffset, err := pr.ReadNextEntry()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(wr, currentOffset)
 }

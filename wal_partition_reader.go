@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -22,14 +24,14 @@ type WalPartitionReader struct {
 }
 
 //NewWalPartitionReader creates a new WalPartitionReader
-func NewWalPartitionReader(partitionParentDir string, partitionNumber uint32, walFile string, offset int64) (*WalPartitionReader, error) {
+func NewWalPartitionReader(partitionParentDir string, partitionNumber uint32, walFile string) (*WalPartitionReader, error) {
 	partitionDir := fmt.Sprint(partitionParentDir, string(os.PathSeparator), partitionNumber)
 	err := os.MkdirAll(partitionDir, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
 
-	file, reader, err := createReader(partitionParentDir, walFile, offset)
+	file, err := createReader(fmt.Sprint(partitionDir, string(os.PathSeparator), walFile))
 	if err != nil {
 		return nil, err
 	}
@@ -38,19 +40,66 @@ func NewWalPartitionReader(partitionParentDir string, partitionNumber uint32, wa
 		Closed:          false,
 		PartitionDir:    partitionDir,
 		File:            file,
-		Reader:          bufio.NewReader(*reader),
+		Reader:          bufio.NewReader(file),
 		PartitionNumber: partitionNumber,
 	}
 
 	return ret, nil
 }
 
-func createReader(partitionParentDir string, walFile string, offset int64) (*os.File, *io.Reader, error) {
-	return nil, nil, nil
+func createReader(walFile string) (*os.File, error) {
+	file, err := os.Open(walFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return file, nil
 }
 
-func (w *WalPartitionReader) ReadNextEntry() (wr *WalExRecord, currentOffset int64, err error) {
-	return nil, -1, nil
+//ReadNextEntry reads the next entry from this wal segment.
+func (w *WalPartitionReader) ReadNextEntry() (*WalExRecord, int64, error) {
+	size := []byte{0, 0, 0, 0}
+	n, err := io.ReadFull(w.Reader, size)
+	if err == io.ErrUnexpectedEOF {
+		//Is this corrupted ?
+		w.CurrentOffset += int64(n)
+		return nil, w.CurrentOffset, err
+	} else if err == io.EOF {
+		return nil, w.CurrentOffset, err
+	}
+
+	//Succeeded in reading size.
+	w.CurrentOffset += int64(n)
+	sz := binary.LittleEndian.Uint32(size)
+	buff := make([]byte, sz)
+	n, err = io.ReadFull(w.Reader, buff)
+	if err == io.ErrUnexpectedEOF {
+		//Is this corrupted ?
+		w.CurrentOffset += int64(n)
+		return nil, w.CurrentOffset, err
+	} else if err == io.EOF {
+		return nil, w.CurrentOffset, err
+	}
+
+	//We succeeded reading entries.
+	w.CurrentOffset += int64(n)
+	wr := &WalExRecord{
+		Record: &WalRecord{},
+		Id:     &WalRecordId{},
+	}
+	_, err = wr.Write(buff)
+	if err != nil {
+		//Unlikely to happen
+		return nil, w.CurrentOffset, nil
+	}
+
+	//Check for Crc32.
+	crc, err := Crc32(buff[:(sz - uint32(binary.Size(size)))])
+	if crc != wr.Crc {
+		return wr, w.CurrentOffset, errors.New("Wrong Checksum")
+	}
+
+	return wr, w.CurrentOffset, nil
 }
 
 //Close closes the underlaying file handle.
