@@ -81,7 +81,7 @@ func (w *WalPartitionReader) ReadNextEntry() (*WalExRecord, int64, error) {
 		return nil, w.CurrentOffset, err
 	}
 
-	//We succeeded reading entries.
+	//We succeeded reading content.
 	w.CurrentOffset += int64(n)
 	wr := &WalExRecord{
 		Record: &WalRecord{},
