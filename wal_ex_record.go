@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 )
 
 //WalRecordID a complex identification for wal entries.
@@ -76,14 +75,14 @@ func (wr *WalExRecord) Write(p []byte) (n int, err error) {
 	var tmpUint64 uint64 = 0
 
 	if len(p) < binary.Size(tmpUint64) {
-		return -1, errors.New("Slice length not large enough. Could not read timestamp.")
+		return -1, NewWalError(ErrSliceNotLargeEnough, "Slice length not large enough. Could not read timestamp.")
 	}
 
 	wr.ID.Timestamp = int64(binary.LittleEndian.Uint64(p))
 	idx += uint32(binary.Size(wr.ID.Timestamp))
 
 	if len(p[idx:]) < binary.Size(wr.ID.Sequence) {
-		return -1, errors.New("Slice length not large enough. Could not read sequence.")
+		return -1, NewWalError(ErrSliceNotLargeEnough, "Slice length not large enough. Could not read sequence.")
 	}
 
 	wr.ID.Sequence = uint32(binary.LittleEndian.Uint32(p[idx:]))
@@ -96,7 +95,7 @@ func (wr *WalExRecord) Write(p []byte) (n int, err error) {
 
 	idx += uint32(cnt)
 	if len(p[idx:]) < binary.Size(wr.Crc) {
-		return -1, errors.New("Slice length not large enough. Could not read Crc.")
+		return -1, NewWalError(ErrSliceNotLargeEnough, "Slice length not large enough. Could not read Crc.")
 	}
 
 	wr.Crc = uint32(binary.LittleEndian.Uint32(p[idx:]))
