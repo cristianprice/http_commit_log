@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"encoding/binary"
-	"fmt"
 	"os"
 	"sync"
 
@@ -12,42 +11,34 @@ import (
 
 //WalPartitionWriter abstraction for individual partition writer.
 type WalPartitionWriter struct {
-	mutex sync.Mutex
+	mutex          sync.Mutex
+	MaxSegmentSize int64
 
-	Closed          bool
-	PartitionDir    string
-	PartitionNumber uint32
-	MaxSegmentSize  int64
+	File   *os.File
+	Writer *bufio.Writer
 
-	WalSyncType WalSyncType
-	File        *os.File
-	Writer      *bufio.Writer
-
+	WalSyncType   WalSyncType
 	CurrentOffset int64
 }
 
 //NewWalPartitionWriter creates a new WalPartitionWriter
-func NewWalPartitionWriter(partitionParentDir string, partitionNumber uint32, maxSegmentSize int64, wst WalSyncType) (*WalPartitionWriter, error) {
-	partitionDir := fmt.Sprint(partitionParentDir, string(os.PathSeparator), partitionNumber)
-	err := os.MkdirAll(partitionDir, os.ModePerm)
+func NewWalPartitionWriter(filePath string, maxSegmentSize int64, walSyncType WalSyncType) (*WalPartitionWriter, error) {
+
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return nil, err
 	}
 
-	file, writer, offset, err := createWriter(partitionDir, maxSegmentSize)
+	offset, err := MoveToLastValidWalEntry(file, maxSegmentSize)
 	if err != nil {
 		return nil, err
 	}
 
 	ret := &WalPartitionWriter{
-		Closed:          false,
-		PartitionDir:    partitionDir,
-		File:            file,
-		Writer:          writer,
-		MaxSegmentSize:  maxSegmentSize,
-		PartitionNumber: partitionNumber,
-		WalSyncType:     wst,
-		CurrentOffset:   offset,
+		File:          file,
+		Writer:        bufio.NewWriter(file),
+		CurrentOffset: offset,
+		WalSyncType:   walSyncType,
 	}
 
 	return ret, nil
@@ -56,6 +47,10 @@ func NewWalPartitionWriter(partitionParentDir string, partitionNumber uint32, ma
 func (w *WalPartitionWriter) Write(p []byte) (n int, err error) {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
+
+	if w.CurrentOffset > w.MaxSegmentSize {
+		return -1, NewWalError(ErrSegmentSizeLimitReached, "Segment limit has been reached.")
+	}
 
 	size := []byte{0, 0, 0, 0}
 	binary.LittleEndian.PutUint32(size, uint32(binary.Size(p)))
@@ -101,45 +96,11 @@ func (w *WalPartitionWriter) Flush() {
 func (w *WalPartitionWriter) Close() {
 	w.Flush()
 
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
 	err := w.File.Close()
 	if err != nil {
 		log.Error("Failed to close file: ", w.File, " ", err)
 	}
-}
-
-func createWriter(partitionDir string, maxSegmentSize int64) (*os.File, *bufio.Writer, int64, error) {
-	var file *os.File
-	fileName, err := ReturnLastCreatedWalFile(partitionDir)
-	if err != nil || *fileName == "" {
-		*fileName = GenFileName(partitionDir)
-	}
-
-	file, err = os.OpenFile(*fileName, os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		return nil, nil, -1, err
-	}
-
-	offset, err := MoveToLastValidWalEntry(file, maxSegmentSize)
-	if err != nil {
-		return nil, nil, -1, err
-	}
-
-	if offset > maxSegmentSize {
-		oldFileName := fileName
-		*fileName = GenFileName(partitionDir)
-		log.Warn("File: ", *oldFileName, " exceeds size. Creating new one: ", *fileName)
-		file.Close()
-
-		file, err = os.OpenFile(*fileName, os.O_CREATE|os.O_RDWR, 0644)
-		if err != nil {
-			return nil, nil, -1, err
-		}
-
-		offset = 0
-	}
-
-	offset, err = file.Seek(offset, 0)
-	writer := bufio.NewWriter(file)
-
-	return file, writer, offset, nil
 }

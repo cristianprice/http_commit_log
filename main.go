@@ -13,9 +13,12 @@ func main() {
 
 	b := make([]byte, 8)
 	b1 := b[4:]
+
+	sz := copy(b, b1)
+	println(sz)
 	fmt.Println(binary.Size(b), binary.Size(b1))
 
-	pw, err := NewWalPartitionWriter("c:\\tmp", 1, 10000, FlushOnCommit)
+	pw, err := NewWalPartitionWriter("c:\\tmp", 10000, FlushOnCommit)
 	if err != nil {
 		panic(err)
 	}

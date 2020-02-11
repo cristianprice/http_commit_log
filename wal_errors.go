@@ -6,6 +6,9 @@ type ErrCode int32
 const (
 	//ErrSliceNotLargeEnough the slice is not large enough.
 	ErrSliceNotLargeEnough ErrCode = 1
+
+	//ErrSegmentSizeLimitReached the wal segment size limit has been reached.
+	ErrSegmentSizeLimitReached = 2
 )
 
 //WalError errors encapsulation.

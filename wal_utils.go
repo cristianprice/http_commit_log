@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
@@ -9,6 +10,8 @@ import (
 	"os"
 	"sort"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 //Crc32 checksums a byte array.
@@ -48,6 +51,43 @@ func ReturnLastCreatedWalFile(partitionDir string) (*string, error) {
 
 	ret := GenFileNameWith(partitionDir, files[0].Name())
 	return &ret, nil
+}
+
+func CreateTempWriter(partitionDir string, maxSegmentSize int64) (*os.File, *bufio.Writer, int64, error) {
+	var file *os.File
+	fileName, err := ReturnLastCreatedWalFile(partitionDir)
+	if err != nil || *fileName == "" {
+		*fileName = GenFileName(partitionDir)
+	}
+
+	file, err = os.OpenFile(*fileName, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		return nil, nil, -1, err
+	}
+
+	offset, err := MoveToLastValidWalEntry(file, maxSegmentSize)
+	if err != nil {
+		return nil, nil, -1, err
+	}
+
+	if offset > maxSegmentSize {
+		oldFileName := fileName
+		*fileName = GenFileName(partitionDir)
+		log.Warn("File: ", *oldFileName, " exceeds size. Creating new one: ", *fileName)
+		file.Close()
+
+		file, err = os.OpenFile(*fileName, os.O_CREATE|os.O_RDWR, 0644)
+		if err != nil {
+			return nil, nil, -1, err
+		}
+
+		offset = 0
+	}
+
+	offset, err = file.Seek(offset, 0)
+	writer := bufio.NewWriter(file)
+
+	return file, writer, offset, nil
 }
 
 //MoveToLastValidWalEntry will move the offset to the end of last valid entry
