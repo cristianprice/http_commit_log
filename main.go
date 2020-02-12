@@ -16,4 +16,6 @@ func main() {
 
 	print(twr.Name)
 	fmt.Println(twr, err)
+
+	WaitForCtrlC()
 }
