@@ -11,6 +11,9 @@ const (
 	ErrSegmentSizeLimitReached = 2
 )
 
+//ErrSegLimitReached signaled when segment size limit reached.
+var ErrSegLimitReached = NewWalError(ErrSegmentSizeLimitReached, "Segment limit has been reached.")
+
 //WalError errors encapsulation.
 type WalError struct {
 	code    ErrCode

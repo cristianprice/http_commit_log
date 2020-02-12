@@ -1,6 +1,8 @@
 package main
 
-import "time"
+import (
+	"time"
+)
 
 //WalTopicWriter writes to a topic and handles file swapping and so on.
 type WalTopicWriter struct {
@@ -9,6 +11,17 @@ type WalTopicWriter struct {
 	maxSegmentSize   int64
 	partitionWriters []*WalPartitionWriter
 	topicChannel     chan WalRecord
+}
+
+//Close closes topic writer and releases all resources.
+func (w *WalTopicWriter) Close() error {
+	return nil
+}
+
+//WriteWalRecord writes wal records to different partitions.
+func (w *WalTopicWriter) WriteWalRecord(r *WalRecord) error {
+
+	return nil
 }
 
 //NewTopicWriter the actual topic writer.

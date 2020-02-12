@@ -49,7 +49,7 @@ func (w *WalPartitionWriter) Write(p []byte) (n int, err error) {
 	defer w.mutex.Unlock()
 
 	if w.CurrentOffset > w.MaxSegmentSize {
-		return -1, NewWalError(ErrSegmentSizeLimitReached, "Segment limit has been reached.")
+		return -1, ErrSegLimitReached
 	}
 
 	size := []byte{0, 0, 0, 0}
@@ -75,7 +75,7 @@ func (w *WalPartitionWriter) Write(p []byte) (n int, err error) {
 }
 
 //Flush flushes data to file handle based on options
-func (w *WalPartitionWriter) Flush() {
+func (w *WalPartitionWriter) Flush() error {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
@@ -86,21 +86,17 @@ func (w *WalPartitionWriter) Flush() {
 
 	if w.WalSyncType == FlushOnCommit {
 		err = w.File.Sync()
-		if err != nil {
-			log.Error("Failed to sync file: ", w.File, " ", err)
-		}
 	}
+
+	return err
 }
 
 //Close closes the underlaying file handle.
-func (w *WalPartitionWriter) Close() {
+func (w *WalPartitionWriter) Close() error {
 	w.Flush()
 
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
-	err := w.File.Close()
-	if err != nil {
-		log.Error("Failed to close file: ", w.File, " ", err)
-	}
+	return w.File.Close()
 }
