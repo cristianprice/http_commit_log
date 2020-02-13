@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -67,7 +68,7 @@ func (w *WalTopicWriter) WriteWalRecord(r *WalRecord) (chan error, error) {
 
 func partitionHandler(ctx context.Context, partitionCount uint32, wp *WalPartition) {
 
-	myCtx, _ := context.WithCancel(ctx)
+	myCtx := context.WithValue(ctx, fmt.Sprint(partitionCount), fmt.Sprint(partitionCount))
 	var wrEx *WalExRecord
 	pw := wp.partitionWriter
 	wch := wp.writerChannel
