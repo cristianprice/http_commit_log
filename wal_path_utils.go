@@ -6,16 +6,12 @@ import (
 )
 
 //Path is a directory path abstraction.
-type Path struct {
-	CurrentPath string
-}
+type Path string
 
 //AddExtension is a builder method.
 func (p *Path) AddExtension(ext string) *Path {
-	ret := &Path{
-		CurrentPath: fmt.Sprint(p.CurrentPath, ext),
-	}
-	return ret
+	ret := Path(fmt.Sprint(p, ext))
+	return &ret
 }
 
 //AddUint32 is a builder method.
@@ -30,8 +26,10 @@ func (p *Path) AddInt64(child int64) *Path {
 
 //Add is a builder method.
 func (p *Path) Add(child string) *Path {
-	ret := &Path{
-		CurrentPath: fmt.Sprint(p.CurrentPath, string(os.PathSeparator), child),
-	}
-	return ret
+	ret := Path(fmt.Sprint(p, string(os.PathSeparator), child))
+	return &ret
+}
+
+func (p *Path) String() string {
+	return string(*p)
 }

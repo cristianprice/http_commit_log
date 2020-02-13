@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"time"
 )
@@ -12,6 +13,9 @@ type WalTopicWriter struct {
 	maxSegmentSize int64
 	partitions     []*WalPartition
 	topicChannel   chan WalRecord
+
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 //WalPartition wraps the partition writer and a channel to send events to.
@@ -22,24 +26,28 @@ type WalPartition struct {
 
 //Close closes topic writer and releases all resources.
 func (w *WalTopicWriter) Close() error {
+	if w.cancel != nil {
+		w.cancel()
+	}
+
 	return nil
 }
 
 //WriteWalRecord writes wal records to different partitions.
 func (w *WalTopicWriter) WriteWalRecord(r *WalRecord) error {
-
 	return nil
 }
 
 //NewTopicWriter the actual topic writer.
-func NewTopicWriter(parentDir string, name string, partitionCount uint32, maxSegmentSize int64, walSyncType WalSyncType) (*WalTopicWriter, error) {
+func NewTopicWriter(parentDir Path, name string, partitionCount uint32, maxSegmentSize int64, walSyncType WalSyncType) (*WalTopicWriter, error) {
 
-	path := (&Path{CurrentPath: parentDir}).Add(name)
+	path := parentDir.Add(name)
 
 	ret := &WalTopicWriter{
 		PartitionCount: partitionCount,
 		Name:           name,
 		maxSegmentSize: maxSegmentSize,
+		topicChannel:   make(chan WalRecord),
 	}
 
 	ret.partitions = make([]*WalPartition, partitionCount)
@@ -47,26 +55,39 @@ func NewTopicWriter(parentDir string, name string, partitionCount uint32, maxSeg
 	var i uint32
 	for i = 0; i < partitionCount; i++ {
 		ret.partitions[i] = &WalPartition{
-			partitionWriter: newWalPartitionWriter(path.CurrentPath, i, maxSegmentSize, walSyncType),
+			partitionWriter: newWalPartitionWriter(*path, i, maxSegmentSize, walSyncType),
 			writerChannel:   make(chan WalRecord),
 		}
 	}
 
 	//We assume nothing panicked so far.
-	for i = 0; i < partitionCount; i++ {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ret.ctx)
+	ret.ctx = ctx
+	ret.cancel = cancel
 
-	}
+	go func(ctx context.Context, cancel context.CancelFunc) {
+		var walRec WalRecord
 
+		for {
+			select {
+			case walRec = <-ret.topicChannel:
+				println(walRec)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}(ret.ctx, cancel)
 	return ret, nil
 }
 
-func newWalPartitionWriter(topicDir string, partitionCount uint32, maxSegmentSize int64, walSyncType WalSyncType) *WalPartitionWriter {
-	filePath := (&Path{CurrentPath: topicDir}).AddUint32(partitionCount)
-	os.MkdirAll(filePath.CurrentPath, 644)
+func newWalPartitionWriter(topicDir Path, partitionCount uint32, maxSegmentSize int64, walSyncType WalSyncType) *WalPartitionWriter {
+	filePath := topicDir.AddUint32(partitionCount)
+	os.MkdirAll(filePath.String(), 644)
 
 	filePath = filePath.AddInt64(time.Now().UnixNano()).AddExtension(".wal")
 
-	wpw, err := NewWalPartitionWriter(filePath.CurrentPath, maxSegmentSize, walSyncType)
+	wpw, err := NewWalPartitionWriter(filePath.String(), maxSegmentSize, walSyncType)
 	if err != nil {
 		panic(err)
 	}
