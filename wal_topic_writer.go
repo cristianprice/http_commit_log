@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 //WalTopicWriter writes to a topic and handles file swapping and so on.
@@ -28,6 +30,13 @@ type WalPartition struct {
 func (w *WalTopicWriter) Close() error {
 	if w.cancel != nil {
 		w.cancel()
+	}
+
+	close(w.topicChannel)
+	for _, p := range w.partitions {
+		close(p.writerChannel)
+		err := p.partitionWriter.Close()
+		log.Warn("Failed to close partition writer: ", err)
 	}
 
 	return nil
@@ -74,10 +83,12 @@ func NewTopicWriter(parentDir Path, name string, partitionCount uint32, maxSegme
 			case walRec = <-ret.topicChannel:
 				println(walRec)
 			case <-ctx.Done():
+				ret.Close()
 				return
 			}
 		}
 	}(ret.ctx, cancel)
+
 	return ret, nil
 }
 
