@@ -22,10 +22,14 @@ type WalTopicWriter struct {
 	currentSequence uint32
 }
 
+type walRequest struct {
+	walRecord *WalExRecord
+	respChan  chan error
+}
+
 //WalPartition wraps the partition writer and a channel to send events to.
 type WalPartition struct {
-	resultChannel   chan error
-	writerChannel   chan *WalExRecord
+	writerChannel   chan *walRequest
 	partitionWriter *WalPartitionWriter
 }
 
@@ -46,54 +50,75 @@ func (w *WalTopicWriter) Close() error {
 }
 
 //WriteWalRecord writes wal records to different partitions.
-func (w *WalTopicWriter) WriteWalRecord(r *WalRecord) (chan error, error) {
+func (w *WalTopicWriter) WriteWalRecord(r *WalRecord) chan error {
+	retChan := make(chan error)
+
 	if w.ctx.Err() != nil {
-		return nil, w.ctx.Err()
+		go func() {
+			retChan <- w.ctx.Err()
+		}()
+
+		return retChan
 	}
 
-	crc, err := Crc32([]byte(r.Key))
-	if err != nil {
-		return nil, err
-	}
-
-	partition := (crc % w.PartitionCount)
-	pObj := w.partitions[partition]
 	w.currentSequence++
+	go func(seq uint32) {
 
-	wrEx := NewWalExRecord(r, w.currentSequence, time.Now().UnixNano())
-	pObj.writerChannel <- wrEx
+		crc, err := Crc32([]byte(r.Key))
+		if err != nil {
+			return nil, err
+		}
 
-	return pObj.resultChannel, nil
+		partition := (crc % w.PartitionCount)
+		pObj := w.partitions[partition]
+
+		wrEx := NewWalExRecord(r, w.currentSequence, time.Now().UnixNano())
+		pObj.writerChannel <- &walRequest{wrEx, retChan}
+
+	}(w.currentSequence)
+
+	return retChan
 }
 
 func partitionHandler(ctx context.Context, partitionCount uint32, wp *WalPartition) {
 
 	myCtx := context.WithValue(ctx, fmt.Sprint(partitionCount), fmt.Sprint(partitionCount))
 	var wrEx *WalExRecord
-	pw := wp.partitionWriter
-	wch := wp.writerChannel
+	var wReq *walRequest
 
-	rchan := wp.resultChannel
+	readChan := wp.writerChannel
+	pw := wp.partitionWriter
 
 	select {
-	case wrEx = <-wch:
+	case wReq = <-readChan:
+
+		wrEx = wReq.walRecord
 		b, err := wrEx.Bytes()
 		if err != nil {
-			panic(err)
+
+			wReq.respChan <- err
+			defer close(wReq.respChan)
+			return
+
 		}
 
 		_, err = pw.Write(b)
 		if err == ErrSegLimitReached {
 			//TODO handle this with file rollover.
 		} else if err != nil {
-			panic(err)
+			wReq.respChan <- err
+			defer close(wReq.respChan)
+			return
+
 		} else {
 			err := pw.Flush()
-			rchan <- err
+			wReq.respChan <- err
+			defer close(wReq.respChan)
+			return
+
 		}
 
 	case <-myCtx.Done():
-		close(wp.resultChannel)
 		close(wp.writerChannel)
 		wp.partitionWriter.Close()
 		return
