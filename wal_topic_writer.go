@@ -91,39 +91,65 @@ func partitionHandler(ctx context.Context, partitionCount uint32, wp *WalPartiti
 	var wReq *walRequest
 
 	readChan := wp.writerChannel
+
+	for {
+
+		select {
+		case wReq = <-readChan:
+
+			wrEx = wReq.walRecord
+			b, err := wrEx.Bytes()
+			if err != nil {
+				wReq.respChan <- err
+				close(wReq.respChan)
+				continue
+			}
+
+			writeWalExRecord(wReq.respChan, wp, b)
+
+		case <-myCtx.Done():
+			return
+		}
+
+	}
+
+}
+
+func writeWalExRecord(respChan chan error, wp *WalPartition, b []byte) {
 	pw := wp.partitionWriter
 
-	select {
-	case wReq = <-readChan:
-
-		wrEx = wReq.walRecord
-		b, err := wrEx.Bytes()
+	_, err := pw.Write(b)
+	if err == ErrSegLimitReached {
+		//TODO handle this with file rollover.
+		err = wp.partitionWriter.Close()
 		if err != nil {
-
-			wReq.respChan <- err
-			defer close(wReq.respChan)
+			respChan <- err
 			return
-
 		}
 
-		_, err = pw.Write(b)
-		if err == ErrSegLimitReached {
-			//TODO handle this with file rollover.
-		} else if err != nil {
-			wReq.respChan <- err
-			defer close(wReq.respChan)
-			return
+		fPath := GenFileName(wp.partitionWriter.DirPath.String())
+		maxSegSize := wp.partitionWriter.MaxSegmentSize
+		walSyncType := wp.partitionWriter.WalSyncType
 
-		} else {
-			err := pw.Flush()
-			wReq.respChan <- err
-			defer close(wReq.respChan)
+		wp.partitionWriter, err = NewWalPartitionWriter(fPath, maxSegSize, walSyncType)
+		if err != nil {
+			respChan <- err
 			return
-
 		}
 
-	case <-myCtx.Done():
+		writeWalExRecord(respChan, wp, b)
+
+	} else if err != nil {
+		respChan <- err
+		defer close(respChan)
 		return
+
+	} else {
+		err := pw.Flush()
+		respChan <- err
+		defer close(respChan)
+		return
+
 	}
 
 }
@@ -146,7 +172,7 @@ func NewTopicWriter(parentDir Path, name string, partitionCount uint32, maxSegme
 	var i uint32
 	for i = 0; i < partitionCount; i++ {
 		ret.partitions[i] = &WalPartition{
-			partitionWriter: newWalPartitionWriter(*path, i, maxSegmentSize, walSyncType),
+			partitionWriter: newWalPartitionWriter(path, i, maxSegmentSize, walSyncType),
 			writerChannel:   make(chan *walRequest),
 		}
 	}

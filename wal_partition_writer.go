@@ -19,6 +19,7 @@ type WalPartitionWriter struct {
 
 	WalSyncType   WalSyncType
 	CurrentOffset int64
+	DirPath       *Path
 }
 
 //NewWalPartitionWriter creates a new WalPartitionWriter
@@ -34,11 +35,14 @@ func NewWalPartitionWriter(filePath string, maxSegmentSize int64, walSyncType Wa
 		return nil, err
 	}
 
+	dirPath := Path(filePath).BaseDir()
+
 	ret := &WalPartitionWriter{
 		File:          file,
 		Writer:        bufio.NewWriter(file),
 		CurrentOffset: offset,
 		WalSyncType:   walSyncType,
+		DirPath:       &dirPath,
 	}
 
 	return ret, nil
