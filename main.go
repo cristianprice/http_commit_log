@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	log "github.com/sirupsen/logrus"
 )
 
@@ -14,8 +12,29 @@ func main() {
 		panic(err)
 	}
 
-	print(twr.Name)
-	fmt.Println(twr, err)
+	retChan := twr.WriteWalRecord(&WalRecord{
+		Key:   "Hey",
+		Value: []byte{11, 223, 3},
+	})
+
+	print(<-retChan)
+
+	retChan = twr.WriteWalRecord(&WalRecord{
+		Key:   "Hey1",
+		Value: []byte{11, 223, 3},
+	})
+
+	print(<-retChan)
+
+	retChan = twr.WriteWalRecord(&WalRecord{
+		Key:   "Hey2",
+		Value: []byte{11, 223, 3},
+	})
+
+	print(<-retChan)
 
 	WaitForCtrlC()
+
+	//time.Sleep(15 * time.Second)
+	defer twr.Close()
 }

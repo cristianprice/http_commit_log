@@ -9,6 +9,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type ctxKey string
+
 //WalTopicWriter writes to a topic and handles file swapping and so on.
 type WalTopicWriter struct {
 	PartitionCount uint32
@@ -43,7 +45,9 @@ func (w *WalTopicWriter) Close() error {
 	for _, p := range w.partitions {
 		close(p.writerChannel)
 		err := p.partitionWriter.Close()
-		log.Warn("Failed to close partition writer: ", err)
+		if err != nil {
+			log.Warn("Failed to close partition writer: ", err)
+		}
 	}
 
 	return nil
@@ -54,6 +58,7 @@ func (w *WalTopicWriter) WriteWalRecord(r *WalRecord) chan error {
 	retChan := make(chan error)
 
 	if w.ctx.Err() != nil {
+		log.Warnln("Context closed: ", w.ctx.Err())
 		go func() {
 			retChan <- w.ctx.Err()
 		}()
@@ -62,27 +67,26 @@ func (w *WalTopicWriter) WriteWalRecord(r *WalRecord) chan error {
 	}
 
 	w.currentSequence++
-	go func(seq uint32) {
+	crc, err := Crc32([]byte(r.Key))
+	if err != nil {
+		go func() {
+			retChan <- err
+		}()
+		return retChan
+	}
 
-		crc, err := Crc32([]byte(r.Key))
-		if err != nil {
-			return nil, err
-		}
+	partition := (crc % w.PartitionCount)
+	pObj := w.partitions[partition]
 
-		partition := (crc % w.PartitionCount)
-		pObj := w.partitions[partition]
-
-		wrEx := NewWalExRecord(r, w.currentSequence, time.Now().UnixNano())
-		pObj.writerChannel <- &walRequest{wrEx, retChan}
-
-	}(w.currentSequence)
+	wrEx := NewWalExRecord(r, w.currentSequence, time.Now().UnixNano())
+	pObj.writerChannel <- &walRequest{wrEx, retChan}
 
 	return retChan
 }
 
 func partitionHandler(ctx context.Context, partitionCount uint32, wp *WalPartition) {
 
-	myCtx := context.WithValue(ctx, fmt.Sprint(partitionCount), fmt.Sprint(partitionCount))
+	myCtx := context.WithValue(ctx, ctxKey(fmt.Sprint(partitionCount)), fmt.Sprint(partitionCount))
 	var wrEx *WalExRecord
 	var wReq *walRequest
 
@@ -119,8 +123,6 @@ func partitionHandler(ctx context.Context, partitionCount uint32, wp *WalPartiti
 		}
 
 	case <-myCtx.Done():
-		close(wp.writerChannel)
-		wp.partitionWriter.Close()
 		return
 	}
 
@@ -145,13 +147,14 @@ func NewTopicWriter(parentDir Path, name string, partitionCount uint32, maxSegme
 	for i = 0; i < partitionCount; i++ {
 		ret.partitions[i] = &WalPartition{
 			partitionWriter: newWalPartitionWriter(*path, i, maxSegmentSize, walSyncType),
-			writerChannel:   make(chan *WalExRecord),
+			writerChannel:   make(chan *walRequest),
 		}
 	}
 
 	//We assume nothing panicked so far.
 	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ret.ctx)
+	ctx, cancel := context.WithCancel(ctx)
+
 	ret.ctx = ctx
 	ret.cancel = cancel
 
@@ -163,7 +166,6 @@ func NewTopicWriter(parentDir Path, name string, partitionCount uint32, maxSegme
 			case walRec = <-ret.topicChannel:
 				ret.WriteWalRecord(walRec)
 			case <-ctx.Done():
-				ret.Close()
 				return
 			}
 		}
