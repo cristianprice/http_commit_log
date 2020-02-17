@@ -4,6 +4,8 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+
+	log "github.com/sirupsen/logrus"
 )
 
 //WaitForCtrlC implementation to wait for a signal.
@@ -18,6 +20,6 @@ func WaitForCtrlC() {
 		endWaiter.Done()
 	}()
 
-	println("Waiting for CTRL+C ...")
+	log.Info("Waiting for CTRL+C ...")
 	endWaiter.Wait()
 }

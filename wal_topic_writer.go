@@ -54,6 +54,7 @@ func (w *WalTopicWriter) Close() error {
 }
 
 //WriteWalRecord writes wal records to different partitions.
+// The channel returned gets owned and closed by receiver.
 func (w *WalTopicWriter) WriteWalRecord(r *WalRecord) chan error {
 	retChan := make(chan error)
 
@@ -96,12 +97,15 @@ func partitionHandler(ctx context.Context, partitionCount uint32, wp *WalPartiti
 
 		select {
 		case wReq = <-readChan:
+			if wReq == nil {
+				log.Warn("Nil value sent to topic writer channel.")
+				return
+			}
 
 			wrEx = wReq.walRecord
 			b, err := wrEx.Bytes()
 			if err != nil {
 				wReq.respChan <- err
-				close(wReq.respChan)
 				continue
 			}
 
@@ -120,7 +124,6 @@ func writeWalExRecord(respChan chan error, wp *WalPartition, b []byte) {
 
 	_, err := pw.Write(b)
 	if err == ErrSegLimitReached {
-		//TODO handle this with file rollover.
 		err = wp.partitionWriter.Close()
 		if err != nil {
 			respChan <- err
@@ -141,13 +144,11 @@ func writeWalExRecord(respChan chan error, wp *WalPartition, b []byte) {
 
 	} else if err != nil {
 		respChan <- err
-		defer close(respChan)
 		return
 
 	} else {
 		err := pw.Flush()
 		respChan <- err
-		defer close(respChan)
 		return
 
 	}
