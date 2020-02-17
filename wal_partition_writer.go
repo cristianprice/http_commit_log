@@ -38,11 +38,12 @@ func NewWalPartitionWriter(filePath string, maxSegmentSize int64, walSyncType Wa
 	dirPath := Path(filePath).BaseDir()
 
 	ret := &WalPartitionWriter{
-		File:          file,
-		Writer:        bufio.NewWriter(file),
-		CurrentOffset: offset,
-		WalSyncType:   walSyncType,
-		DirPath:       &dirPath,
+		File:           file,
+		Writer:         bufio.NewWriter(file),
+		CurrentOffset:  offset,
+		WalSyncType:    walSyncType,
+		DirPath:        &dirPath,
+		MaxSegmentSize: maxSegmentSize,
 	}
 
 	return ret, nil
