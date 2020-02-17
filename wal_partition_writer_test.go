@@ -21,6 +21,13 @@ func BenchmarkWriteSpeedNoSync(b *testing.B) {
 		log.Fatal(err)
 	}
 
+	defer func(f string) {
+		err := os.Remove(f)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(tmpFile)
+
 	for i := 0; i < b.N; i++ {
 		b := make([]byte, rand.Int31()%10000)
 		_, err := writer.Write(b)
@@ -43,6 +50,13 @@ func BenchmarkWriteSpeedSync(b *testing.B) {
 		log.Fatal(err)
 	}
 
+	defer func(f string) {
+		err := os.Remove(f)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(tmpFile)
+
 	for i := 0; i < b.N; i++ {
 		b := make([]byte, rand.Int31()%10000)
 		_, err := writer.Write(b)
@@ -59,4 +73,5 @@ func BenchmarkWriteSpeedSync(b *testing.B) {
 	}
 
 	writer.Close()
+
 }
