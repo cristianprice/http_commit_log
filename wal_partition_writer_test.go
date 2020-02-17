@@ -1,11 +1,12 @@
 package main
 
 import (
-	"log"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func path() string {

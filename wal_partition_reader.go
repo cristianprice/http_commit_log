@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 
@@ -25,20 +24,20 @@ type WalPartitionReader struct {
 
 //NewWalPartitionReader creates a new WalPartitionReader
 func NewWalPartitionReader(partitionParentDir string, partitionNumber uint32, walFile string) (*WalPartitionReader, error) {
-	partitionDir := fmt.Sprint(partitionParentDir, string(os.PathSeparator), partitionNumber)
-	err := os.MkdirAll(partitionDir, os.ModePerm)
+	partitionDir := Path(partitionParentDir).AddUint32(partitionNumber)
+	err := os.MkdirAll(partitionDir.String(), os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
 
-	file, err := createReader(fmt.Sprint(partitionDir, string(os.PathSeparator), walFile))
+	file, err := createReader(partitionDir.Add(walFile).String())
 	if err != nil {
 		return nil, err
 	}
 
 	ret := &WalPartitionReader{
 		Closed:          false,
-		PartitionDir:    partitionDir,
+		PartitionDir:    partitionDir.String(),
 		File:            file,
 		Reader:          bufio.NewReader(file),
 		PartitionNumber: partitionNumber,
