@@ -90,15 +90,19 @@ func (w *WalPartitionWriter) Write(p []byte) (n int, err error) {
 
 //Flush flushes data to file handle based on options
 func (w *WalPartitionWriter) Flush() error {
+
+	log.Debug("Locking ...")
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
+	log.Debug("Flushing to disk.")
 	err := w.Writer.Flush()
 	if err != nil {
 		log.Warn("Failed to flush to file: ", w.File, " ", err)
 	}
 
 	if w.WalSyncType == FlushOnCommit {
+		log.Debug("Syncing to disk.")
 		err = w.File.Sync()
 	}
 
@@ -107,10 +111,12 @@ func (w *WalPartitionWriter) Flush() error {
 
 //Close closes the underlaying file handle.
 func (w *WalPartitionWriter) Close() error {
+	log.Debug("Closing writer.")
 	w.Flush()
 
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
+	log.Debug("Closing file: ", w.File)
 	return w.File.Close()
 }

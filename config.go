@@ -27,6 +27,7 @@ func init() {
 	})
 
 	log.SetLevel(log.DebugLevel)
+	log.SetReportCaller(true)
 }
 
 //WalSyncType sets the type of commit.

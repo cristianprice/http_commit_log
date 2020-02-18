@@ -30,7 +30,7 @@ func BenchmarkWriteSpeedNoSync(b *testing.B) {
 	}(tmpFile)
 
 	for i := 0; i < b.N; i++ {
-		b := make([]byte, rand.Int31()%10000)
+		b := make([]byte, 1000)
 		_, err := writer.Write(b)
 		if err == ErrSegLimitReached {
 			log.Fatal(err)
