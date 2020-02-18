@@ -56,6 +56,8 @@ func (w *WalTopicWriter) Close() error {
 //WriteWalRecord writes wal records to different partitions.
 // The channel returned gets owned and closed by receiver.
 func (w *WalTopicWriter) WriteWalRecord(r *WalRecord) chan error {
+	log.Debug("Received object: ", r)
+	log.Debug("Creating return channel.")
 	retChan := make(chan error)
 
 	if w.ctx.Err() != nil {
@@ -68,7 +70,9 @@ func (w *WalTopicWriter) WriteWalRecord(r *WalRecord) chan error {
 	}
 
 	w.currentSequence++
+	log.Debug("Increased current sequence: ", w.currentSequence)
 	crc, err := Crc32([]byte(r.Key))
+	log.Debug("Calculated crc: ", crc)
 	if err != nil {
 		go func() {
 			retChan <- err
@@ -77,10 +81,13 @@ func (w *WalTopicWriter) WriteWalRecord(r *WalRecord) chan error {
 	}
 
 	partition := (crc % w.PartitionCount)
+	log.Debug("Selected partition: ", partition)
 	pObj := w.partitions[partition]
 
 	wrEx := NewWalExRecord(r, w.currentSequence, time.Now().UnixNano())
+	log.Debug("Sending walExRecord to the partition channel: ", wrEx.Record.Key)
 	pObj.writerChannel <- &walRequest{wrEx, retChan}
+	log.Debug("Sent walExRecord to the partition channel ...")
 
 	return retChan
 }
