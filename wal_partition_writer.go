@@ -24,17 +24,20 @@ type WalPartitionWriter struct {
 
 //NewWalPartitionWriter creates a new WalPartitionWriter
 func NewWalPartitionWriter(filePath string, maxSegmentSize int64, walSyncType WalSyncType) (*WalPartitionWriter, error) {
+	log.Debugf("Creating new partition writer: filePath:%s, maxSegmentSize: %d, walSyncType: %s", filePath, maxSegmentSize, walSyncType)
 
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return nil, err
 	}
 
+	log.Debug("Opened file: ", filePath)
 	offset, err := MoveToLastValidWalEntry(file, maxSegmentSize)
 	if err != nil {
 		return nil, err
 	}
 
+	log.Debug("Moved offset file to: ", offset)
 	dirPath := Path(filePath).BaseDir()
 
 	ret := &WalPartitionWriter{
@@ -50,10 +53,14 @@ func NewWalPartitionWriter(filePath string, maxSegmentSize int64, walSyncType Wa
 }
 
 func (w *WalPartitionWriter) Write(p []byte) (n int, err error) {
+	log.Debug("Locking for writing.")
+
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
+	log.Debug("Locking done.")
 
 	if w.CurrentOffset > w.MaxSegmentSize {
+		log.Warn("Segment size limit has been reached.")
 		return -1, ErrSegLimitReached
 	}
 
@@ -76,6 +83,8 @@ func (w *WalPartitionWriter) Write(p []byte) (n int, err error) {
 
 	ret += count
 	w.CurrentOffset += int64(ret)
+
+	log.Debug("Incremented offset. Current offset: ", w.CurrentOffset)
 	return ret, nil
 }
 
