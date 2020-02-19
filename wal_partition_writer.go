@@ -67,6 +67,7 @@ func (w *WalPartitionWriter) Write(p []byte) (n int, err error) {
 	size := []byte{0, 0, 0, 0}
 	binary.LittleEndian.PutUint32(size, uint32(binary.Size(p)))
 
+	log.Debug("Packet size to write: ", binary.Size(p))
 	ret := 0
 
 	count, err := w.Writer.Write(size)
@@ -75,8 +76,14 @@ func (w *WalPartitionWriter) Write(p []byte) (n int, err error) {
 	}
 
 	ret += count
-
 	count, err = w.Writer.Write(p)
+
+	if count == binary.Size(p) {
+		log.Debug("Written bytes: ", count)
+	} else {
+		log.Warnf("Was supposed to write: %d but wrote: %d bytes.", binary.Size(p), count)
+	}
+
 	if err != nil {
 		return -1, err
 	}
