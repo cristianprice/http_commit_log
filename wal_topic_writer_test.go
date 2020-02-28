@@ -17,7 +17,7 @@ func BenchmarkTopicWriteSpeedNoSync(b *testing.B) {
 	b.ResetTimer()
 
 	tmpFile := pathTopic()
-	writer, err := NewTopicWriter(tmpFile, "Test", 4, 256, WaitForBatchOrTimeout)
+	writer, err := NewTopicWriter(tmpFile, "Test", 4, 256, NoFlush)
 	if err != nil {
 		log.Fatal(err)
 	}

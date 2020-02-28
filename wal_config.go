@@ -19,18 +19,6 @@ func init() {
 	log.SetReportCaller(true)
 }
 
-//WalSyncType sets the type of commit.
-type WalSyncType string
-
-const (
-
-	//FlushOnCommit flushes to disk after each write. Slow performance.
-	FlushOnCommit WalSyncType = "SyncOnTxEnd"
-
-	//WaitForBatchOrTimeout Waits for a set number of commits or a timeout.
-	WaitForBatchOrTimeout WalSyncType = "WaitForBatchOrTimeout"
-)
-
 //Config is a configuration struct.
 type Config struct {
 	HTTPServerConfig struct {

@@ -17,7 +17,7 @@ func BenchmarkWriteSpeedNoSync(b *testing.B) {
 	b.ResetTimer()
 
 	tmpFile := path()
-	writer, err := NewWalPartitionWriter(tmpFile, 10000000000000, WaitForBatchOrTimeout)
+	writer, err := NewWalPartitionWriter(tmpFile, 10000000000000, NoFlush)
 	if err != nil {
 		log.Fatal(err)
 	}
